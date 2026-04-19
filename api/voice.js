@@ -54,10 +54,10 @@ function say(text, gather = null) {
   const voice = `<Say language="es-ES" voice="Polly.Lucia-Neural">${safe}</Say>`;
   if (gather) {
     return `<?xml version="1.0" encoding="UTF-8"?><Response>
-      <Gather input="speech" language="es-ES" speechTimeout="2" action="${gather}" method="POST">
+      <Gather input="speech" language="es-ES" speechTimeout="auto" speechModel="phone_call" enhanced="true" action="${gather}" method="POST">
         ${voice}
       </Gather>
-      <Redirect>${gather}</Redirect>
+      <Redirect method="POST">${gather}</Redirect>
     </Response>`;
   }
   return `<?xml version="1.0" encoding="UTF-8"?><Response>${voice}<Hangup/></Response>`;
@@ -125,13 +125,13 @@ async function handler(req, res) {
       const cfg = cfgRows[0];
       if (!cfg) return res.end(say('Negocio no encontrado.'));
 
-      /* Crear sesión de llamada */
+      const greeting = cfg.greeting || `Hola, gracias por llamar a ${cfg.bot_name}. ¿En qué puedo ayudarle?`;
+      const initHistory = [{ role: 'assistant', content: greeting }];
       await sbPost('wa_conversations', {
-        phone: callSid, business_slug: urlSlug, history: [], state: 'chatting',
+        phone: callSid, business_slug: urlSlug, history: initHistory, state: 'chatting',
         updated_at: new Date().toISOString()
       });
 
-      const greeting = cfg.greeting || `Hola, gracias por llamar a ${cfg.bot_name}. ¿En qué puedo ayudarle?`;
       const actionUrl = `${BASE_URL}/api/voice?slug=${urlSlug}`;
       return res.end(say(greeting, actionUrl));
     }
@@ -159,6 +159,7 @@ async function handler(req, res) {
       const [name, tel, service, rawDate, time, email] = parts;
       const date = parseDate(rawDate);
 
+      console.log('[VOICE] RESERVA_LISTA parsed:', { name, tel, service, rawDate, date, time, email });
       let saved = false;
       if (name && tel && service && date && time) {
         const tzHour = new Date().toLocaleString('en-US', { timeZone: 'Atlantic/Canary', timeZoneName: 'shortOffset' }).match(/GMT([+-])(\d+)/);
