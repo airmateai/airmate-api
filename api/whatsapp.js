@@ -43,19 +43,26 @@ function buildSystemPrompt(cfg) {
     ? cfg.svcs_json.map(s => `- ${s.name}${s.price ? ' (' + s.price + ')' : ''}${s.duration ? ' — ' + s.duration + ' min' : ''}`).join('\n')
     : '- Consultar disponibilidad';
 
+  const svcNames = Array.isArray(cfg.svcs_json) ? cfg.svcs_json.map(s => s.name).join(', ') : 'los disponibles';
   const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Atlantic/Canary', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  return `Eres el asistente de "${cfg.bot_name || cfg.slug}" por WhatsApp. Sé MUY breve (máx 2-3 líneas por mensaje).
+  return `Eres el asistente de "${cfg.bot_name || cfg.slug}" por WhatsApp. Responde siempre muy breve y natural (máx 2 líneas).
 
-SERVICIOS: ${svcs.replace(/\n/g, ' | ')}
+SERVICIOS DISPONIBLES: ${svcNames}
 HORARIO: ${cfg.schedule_text || (cfg.open_time + '–' + cfg.close_time)}
-HOY: ${today}
+HOY ES: ${today}
 ${cfg.agent_wa ? `CONTACTO DIRECTO: ${cfg.agent_wa}` : ''}
 
-RESERVAS: Cuando el cliente quiera reservar, pide nombre, teléfono, servicio, fecha (formato YYYY-MM-DD) y hora (HH:MM). Cuando tengas los 5 datos, escribe EXACTAMENTE esta línea al final:
-RESERVA_LISTA|nombre|teléfono|servicio|YYYY-MM-DD|HH:MM
+FLUJO DE RESERVA:
+1. Si el cliente quiere reservar, recoge en orden: nombre completo → teléfono → servicio (solo de la lista) → fecha (YYYY-MM-DD, convierte "mañana"/"martes" a fecha real) → hora (HH:MM) → email.
+2. No pidas confirmación extra. En cuanto tengas los 6 datos escribe EXACTAMENTE al final del mensaje:
+RESERVA_LISTA|nombre|teléfono|servicio|YYYY-MM-DD|HH:MM|email
 
-REGLAS: Solo habla de los servicios listados. Nunca inventes precios. Responde en el idioma del cliente.`;
+REGLAS ESTRICTAS:
+- Solo acepta servicios de la lista. Si piden otro, diles cuáles son.
+- Si piden horario fuera del horario del negocio, propón alternativa dentro del horario.
+- Nunca inventes precios ni datos.
+- Responde en el idioma del cliente.`;
 }
 
 async function callAI(systemPrompt, history) {
@@ -147,7 +154,7 @@ async function handler(req, res) {
     if (reply.includes('RESERVA_LISTA|')) {
       const line = reply.split('\n').find(l => l.startsWith('RESERVA_LISTA|')) || '';
       const parts = line.replace('RESERVA_LISTA|', '').split('|').map(p => p.trim());
-      const [name, tel, service, date, time] = parts;
+      const [name, tel, service, date, time, email] = parts;
 
       let saved = false;
       if (name && tel && service && date && time) {
@@ -155,7 +162,7 @@ async function handler(req, res) {
         const ends   = new Date(new Date(starts).getTime() + 60 * 60000).toISOString();
         saved = await sbPost('appointments', {
           business_slug: conv.business_slug, client_name: name, client_phone: tel,
-          client_email: null, service, starts_at: starts, ends_at: ends,
+          client_email: email || null, service, starts_at: starts, ends_at: ends,
           duration_minutes: 60, status: 'pending',
           notes: JSON.stringify({ source: 'whatsapp' }),
           created_at: new Date().toISOString()
