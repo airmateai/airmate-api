@@ -30,6 +30,32 @@ async function sbPatch(table, filter, body) {
   });
 }
 
+const ES_DAYS = { lunes:1, martes:2, miércoles:3, miercoles:3, jueves:4, viernes:5, sábado:6, sabado:6, domingo:0 };
+
+function parseDate(str) {
+  if (!str) return null;
+  const s = str.trim().toLowerCase();
+  /* Already YYYY-MM-DD */
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  /* Relative */
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Atlantic/Canary' }));
+  if (s === 'hoy') return now.toISOString().slice(0,10);
+  if (s === 'mañana' || s === 'manana') {
+    now.setDate(now.getDate() + 1);
+    return now.toISOString().slice(0,10);
+  }
+  /* Day name → next occurrence */
+  const target = ES_DAYS[s];
+  if (target !== undefined) {
+    const cur = now.getDay();
+    let diff = target - cur;
+    if (diff <= 0) diff += 7;
+    now.setDate(now.getDate() + diff);
+    return now.toISOString().slice(0,10);
+  }
+  return null;
+}
+
 function twiml(msg) {
   const safe = String(msg)
     .replace(/&/g, '&amp;')
@@ -169,11 +195,11 @@ async function handler(req, res) {
     if (reply.includes('RESERVA_LISTA|')) {
       const line = reply.split('\n').find(l => l.startsWith('RESERVA_LISTA|')) || '';
       const parts = line.replace('RESERVA_LISTA|', '').split('|').map(p => p.trim());
-      const [name, tel, service, date, time, email] = parts;
+      const [name, tel, service, rawDate, time, email] = parts;
+      const date = parseDate(rawDate);
 
       let saved = false;
       if (name && tel && service && date && time) {
-        /* Interpret time as Canary Islands local time (UTC+0/+1) */
         const tzHour = new Date().toLocaleString('en-US', { timeZone: 'Atlantic/Canary', timeZoneName: 'shortOffset' }).match(/GMT([+-])(\d+)/);
         const tzOffset = tzHour ? `${tzHour[1]}${String(tzHour[2]).padStart(2,'0')}:00` : '+00:00';
         const starts = new Date(`${date}T${time}:00${tzOffset}`).toISOString();
