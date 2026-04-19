@@ -39,11 +39,12 @@ function twiml(msg) {
 }
 
 function buildSystemPrompt(cfg) {
-  const svcs = Array.isArray(cfg.svcs_json)
-    ? cfg.svcs_json.map(s => `- ${s.name}${s.price ? ' (' + s.price + ')' : ''}${s.duration ? ' — ' + s.duration + ' min' : ''}`).join('\n')
+  const svcsRaw = typeof cfg.svcs_json === 'string' ? JSON.parse(cfg.svcs_json) : cfg.svcs_json;
+  const svcsArr = Array.isArray(svcsRaw) ? svcsRaw : [];
+  const svcs = svcsArr.length
+    ? svcsArr.map(s => `- ${s.name}${s.price ? ' (' + s.price + ')' : ''}${s.duration ? ' — ' + s.duration + ' min' : ''}`).join('\n')
     : '- Consultar disponibilidad';
-
-  const svcNames = Array.isArray(cfg.svcs_json) ? cfg.svcs_json.map(s => s.name).join(', ') : 'los disponibles';
+  const svcNames = svcsArr.length ? svcsArr.map(s => s.name).join(', ') : 'Consultar disponibilidad';
   const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Atlantic/Canary', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
 
   return `Eres el asistente de "${cfg.bot_name || cfg.slug}" por WhatsApp. Responde siempre muy breve y natural (máx 2 líneas).
