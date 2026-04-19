@@ -187,7 +187,7 @@ async function handler(req, res) {
 
   } catch (e) {
     console.error('[WA error]', e.message, e.stack);
-    return res.send(twiml('DEBUG: ' + e.message));
+    return res.send(twiml('Lo siento, ha habido un error. Inténtalo en un momento.'));
   }
 }
 
