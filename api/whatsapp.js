@@ -106,25 +106,38 @@ async function handler(req, res) {
       return res.send(twiml('No se recibió mensaje.'));
     }
 
+    /* ── Slug directo por URL (número verificado por negocio) ── */
+    const urlSlug = (req.query && req.query.slug) ? req.query.slug.toLowerCase().trim() : null;
+
     /* ── Cargar conversación ── */
     const convRows = await sbGet(`wa_conversations?phone=eq.${encodeURIComponent(phone)}&limit=1`);
     let conv = convRows[0];
 
-    /* ── Sin conversación: mostrar negocios ── */
+    /* ── Sin conversación ── */
     if (!conv) {
+      if (urlSlug) {
+        /* Número propio del negocio: entrar directo */
+        const cfgRows = await sbGet(`bot_configs?slug=eq.${encodeURIComponent(urlSlug)}&limit=1`);
+        const cfg = cfgRows[0];
+        if (!cfg) return res.send(twiml('Negocio no encontrado.'));
+        await sbPost('wa_conversations', {
+          phone, business_slug: urlSlug, history: [], state: 'chatting',
+          updated_at: new Date().toISOString()
+        });
+        const greeting = cfg.greeting || `¡Hola! Soy el asistente de ${cfg.bot_name}. ¿En qué puedo ayudarte?`;
+        return res.send(twiml(greeting));
+      }
+      /* Número compartido Airmate: preguntar negocio */
       const cfgs = await sbGet('bot_configs?select=slug,bot_name&limit=20');
       const list = cfgs.map(c => `• ${c.bot_name} → escribe: ${c.slug}`).join('\n');
       await sbPost('wa_conversations', {
-        phone,
-        business_slug: null,
-        history: [],
-        state: 'selecting_business',
+        phone, business_slug: null, history: [], state: 'selecting_business',
         updated_at: new Date().toISOString()
       });
       return res.send(twiml(`¡Hola! 👋 Soy el asistente de Airmate.\n\n¿Con qué negocio quieres hablar?\n\n${list}`));
     }
 
-    /* ── Seleccionando negocio ── */
+    /* ── Seleccionando negocio (número compartido) ── */
     if (conv.state === 'selecting_business') {
       const slug = msgBody.toLowerCase().trim();
       const cfgRows = await sbGet(`bot_configs?slug=eq.${encodeURIComponent(slug)}&limit=1`);
@@ -158,7 +171,9 @@ async function handler(req, res) {
 
       let saved = false;
       if (name && tel && service && date && time) {
-        const starts = new Date(`${date}T${time}:00`).toISOString();
+        /* Interpret time as Canary Islands local time (UTC+0/+1) */
+        const tzOffset = new Date().toLocaleString('en-US', { timeZone: 'Atlantic/Canary', timeZoneName: 'shortOffset' }).match(/GMT([+-]\d+)/)?.[1] || '+0';
+        const starts = new Date(`${date}T${time}:00${tzOffset}:00`).toISOString();
         const ends   = new Date(new Date(starts).getTime() + 60 * 60000).toISOString();
         saved = await sbPost('appointments', {
           business_slug: conv.business_slug, client_name: name, client_phone: tel,
