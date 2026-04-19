@@ -55,8 +55,9 @@ HOY ES: ${today}
 ${cfg.agent_wa ? `CONTACTO DIRECTO: ${cfg.agent_wa}` : ''}
 
 FLUJO DE RESERVA:
-1. Si el cliente quiere reservar, recoge en orden: nombre completo → teléfono → servicio (solo de la lista) → fecha (YYYY-MM-DD, convierte "mañana"/"martes" a fecha real) → hora (HH:MM) → email.
-2. No pidas confirmación extra. En cuanto tengas los 6 datos escribe EXACTAMENTE al final del mensaje:
+1. Si el cliente quiere reservar, recoge: nombre completo, teléfono, servicio (solo de la lista), fecha (YYYY-MM-DD), hora (HH:MM), email.
+2. Convierte fechas relativas ("mañana", "el martes") a YYYY-MM-DD usando la fecha de hoy.
+3. NO pidas confirmación. En cuanto tengas los 6 datos, escribe EXACTAMENTE esta línea sola al final:
 RESERVA_LISTA|nombre|teléfono|servicio|YYYY-MM-DD|HH:MM|email
 
 REGLAS ESTRICTAS:
@@ -173,8 +174,9 @@ async function handler(req, res) {
       let saved = false;
       if (name && tel && service && date && time) {
         /* Interpret time as Canary Islands local time (UTC+0/+1) */
-        const tzOffset = new Date().toLocaleString('en-US', { timeZone: 'Atlantic/Canary', timeZoneName: 'shortOffset' }).match(/GMT([+-]\d+)/)?.[1] || '+0';
-        const starts = new Date(`${date}T${time}:00${tzOffset}:00`).toISOString();
+        const tzHour = new Date().toLocaleString('en-US', { timeZone: 'Atlantic/Canary', timeZoneName: 'shortOffset' }).match(/GMT([+-])(\d+)/);
+        const tzOffset = tzHour ? `${tzHour[1]}${String(tzHour[2]).padStart(2,'0')}:00` : '+00:00';
+        const starts = new Date(`${date}T${time}:00${tzOffset}`).toISOString();
         const ends   = new Date(new Date(starts).getTime() + 60 * 60000).toISOString();
         saved = await sbPost('appointments', {
           business_slug: conv.business_slug, client_name: name, client_phone: tel,
