@@ -43,23 +43,19 @@ function buildSystemPrompt(cfg) {
     ? cfg.svcs_json.map(s => `- ${s.name}${s.price ? ' (' + s.price + ')' : ''}${s.duration ? ' — ' + s.duration + ' min' : ''}`).join('\n')
     : '- Consultar disponibilidad';
 
-  return `Eres el asistente de WhatsApp de "${cfg.bot_name || cfg.slug}". Respondes como un dependiente experto y cercano.
+  const today = new Date().toLocaleDateString('es-ES', { timeZone: 'Atlantic/Canary', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
 
-SERVICIOS:
-${svcs}
+  return `Eres el asistente de "${cfg.bot_name || cfg.slug}" por WhatsApp. Sé MUY breve (máx 2-3 líneas por mensaje).
 
+SERVICIOS: ${svcs.replace(/\n/g, ' | ')}
 HORARIO: ${cfg.schedule_text || (cfg.open_time + '–' + cfg.close_time)}
+HOY: ${today}
+${cfg.agent_wa ? `CONTACTO DIRECTO: ${cfg.agent_wa}` : ''}
 
-CÓMO ACTÚAS:
-- Conversa de forma natural y breve (esto es WhatsApp).
-- Informa sobre servicios y horarios cuando pregunten.
-- Cuando el cliente quiera reservar, pídele: nombre, teléfono, servicio, fecha y hora.
-- Cuando tengas TODOS esos datos responde con esta línea exacta al final:
-  RESERVA_LISTA|nombre|teléfono|servicio|fecha|hora
-- Nunca inventes precios ni datos que no tengas.
-${cfg.agent_wa ? `- Teléfono directo: ${cfg.agent_wa}` : ''}
+RESERVAS: Cuando el cliente quiera reservar, pide nombre, teléfono, servicio, fecha (formato YYYY-MM-DD) y hora (HH:MM). Cuando tengas los 5 datos, escribe EXACTAMENTE esta línea al final:
+RESERVA_LISTA|nombre|teléfono|servicio|YYYY-MM-DD|HH:MM
 
-IDIOMA: Responde siempre en el idioma del cliente.`;
+REGLAS: Solo habla de los servicios listados. Nunca inventes precios. Responde en el idioma del cliente.`;
 }
 
 async function callAI(systemPrompt, history) {
