@@ -1,8 +1,9 @@
 /* ─── Airmate Voice Webhook (CommonJS) ─────────────────────────────────── */
 
-const SB_URL = process.env.SB_URL;
-const SB_KEY = process.env.SB_KEY;
-const PROXY  = process.env.PROXY_URL || 'https://bot-airmate-1.vercel.app/api/chat';
+const SB_URL    = process.env.SB_URL;
+const SB_KEY    = process.env.SB_KEY;
+const PROXY     = process.env.PROXY_URL || 'https://bot-airmate-1.vercel.app/api/chat';
+const BASE_URL  = process.env.BASE_URL  || 'https://airmate-api-5sih.vercel.app';
 
 const SB_H = {
   apikey: SB_KEY,
@@ -50,7 +51,7 @@ async function sbPatch(table, filter, body) {
 
 function say(text, gather = null) {
   const safe = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const voice = `<Say language="es-ES" voice="Polly.Conchita">${safe}</Say>`;
+  const voice = `<Say language="es-ES" voice="Polly.Lucia-Neural">${safe}</Say>`;
   if (gather) {
     return `<?xml version="1.0" encoding="UTF-8"?><Response>
       <Gather input="speech" language="es-ES" speechTimeout="2" action="${gather}" method="POST">
@@ -131,7 +132,7 @@ async function handler(req, res) {
       });
 
       const greeting = cfg.greeting || `Hola, gracias por llamar a ${cfg.bot_name}. ¿En qué puedo ayudarle?`;
-      const actionUrl = `/api/voice?slug=${urlSlug}`;
+      const actionUrl = `${BASE_URL}/api/voice?slug=${urlSlug}`;
       return res.end(say(greeting, actionUrl));
     }
 
@@ -188,7 +189,7 @@ async function handler(req, res) {
       history: history.slice(-20), updated_at: new Date().toISOString()
     });
 
-    const actionUrl = `/api/voice?slug=${urlSlug}`;
+    const actionUrl = `${BASE_URL}/api/voice?slug=${urlSlug}`;
     return res.end(say(reply, actionUrl));
 
   } catch (e) {
